@@ -22,7 +22,10 @@ from guided_diffusion.script_util import (model_and_diffusion_defaults,
                                           add_dict_to_argparser)
 from guided_diffusion.train_util import TrainLoop
 from torch.utils.tensorboard import SummaryWriter
+import wandb
 
+
+from playsound import playsound
 
 def main():
     args = create_argparser().parse_args()
@@ -30,6 +33,11 @@ def main():
     th.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+    # Initialize wandb
+    run_name = f"{args.dataset}_{args.image_size}_{args.schedule_sampler}_{args.lr}_{args.batch_size}"
+    wandb.init(project="Wavelet Diffusion 3D", name=run_name, config=args)
+    wandb.config.update(args)  # Save the args to wandb config
 
     summary_writer = None
     if args.use_tensorboard:
@@ -145,4 +153,10 @@ def create_argparser():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        playsound("/home/ymahe/Music/microwave-ding.mp3")
+    except Exception as e:
+        print(e)
+        playsound("/home/ymahe/Music/power-failure.mp3")

@@ -270,7 +270,7 @@ class GaussianDiffusion:
             model_kwargs = {}
 
         B, C = x.shape[:2]
-        
+
         assert t.shape == (B,)
         model_output = model(x, self._scale_timesteps(t), **model_kwargs)
         
@@ -577,11 +577,11 @@ class GaussianDiffusion:
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
             cond_fn=cond_fn,
-            org=org,
+            #org=org,
             model_kwargs=model_kwargs,
             device=device,
             progress=progress,
-            classifier=classifier
+            #classifier=classifier
         ):
             final = sample
       

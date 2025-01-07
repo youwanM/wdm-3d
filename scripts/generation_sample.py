@@ -73,12 +73,13 @@ def main():
         model_kwargs = {}
 
         sample_fn = diffusion.p_sample_loop
+        #sample_fn = diffusion.sample_known
 
         sample = sample_fn(model=model,
                            shape=img.shape,
                            noise=img,
-                           clip_denoised=args.clip_denoised,
-                           model_kwargs=model_kwargs,
+                           #clip_denoised=args.clip_denoised,
+                           #model_kwargs=model_kwargs,
                            )
 
         B, _, D, H, W = sample.size()
@@ -125,6 +126,7 @@ def create_argparser():
         image_size=256,
         half_res_crop=False,
         concat_coords=False, # if true, add 3 (for 3d) or 2 (for 2d) to in_channels
+        num_workers = 24,
     )
     defaults.update({k:v for k, v in model_and_diffusion_defaults().items() if k not in defaults})
     parser = argparse.ArgumentParser()

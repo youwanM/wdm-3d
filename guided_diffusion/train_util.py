@@ -8,6 +8,7 @@ import torch.distributed as dist
 import torch.utils.tensorboard
 from torch.optim import AdamW
 import torch.cuda.amp as amp
+import wandb
 
 import itertools
 
@@ -102,6 +103,22 @@ class TrainLoop:
             logger.warn(
                 "Training requires CUDA. "
             )
+        # Initialize wandb
+        wandb.init(project="diffusion_model_training")
+        wandb.config.update({
+            "batch_size": self.batch_size,
+            "lr": self.lr,
+            "log_interval": self.log_interval,
+            "save_interval": self.save_interval,
+            "resume_checkpoint": self.resume_checkpoint,
+            "resume_step": self.resume_step,
+            "use_fp16": self.use_fp16,
+            "weight_decay": self.weight_decay,
+            "lr_anneal_steps": self.lr_anneal_steps,
+            "dataset": self.dataset,
+            "mode": self.mode,
+            "loss_level": self.loss_level,
+        })
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -160,6 +177,14 @@ class TrainLoop:
 
             names = ["LLL", "LLH", "LHL", "LHH", "HLL", "HLH", "HHL", "HHH"]
 
+            wandb.log({
+                'time/load': t_load,
+                'time/forward': t_fwd,
+                'time/total': t_total,
+                'loss/MSE': lossmse.item(),
+                'step': self.step + self.resume_step
+            })
+
             if self.summary_writer is not None:
                 self.summary_writer.add_scalar('time/load', t_load, global_step=self.step + self.resume_step)
                 self.summary_writer.add_scalar('time/forward', t_fwd, global_step=self.step + self.resume_step)
@@ -171,12 +196,13 @@ class TrainLoop:
                 midplane = sample_idwt[0, 0, :, :, image_size // 2]
                 self.summary_writer.add_image('sample/x_0', midplane.unsqueeze(0),
                                               global_step=self.step + self.resume_step)
-
+                wandb.log({'sample/x_0': [wandb.Image(midplane.unsqueeze(0))]})
                 image_size = sample.size()[2]
                 for ch in range(8):
                     midplane = sample[0, ch, :, :, image_size // 2]
                     self.summary_writer.add_image('sample/{}'.format(names[ch]), midplane.unsqueeze(0),
                                                   global_step=self.step + self.resume_step)
+                    wandb.log({'sample/{}'.format(names[ch]): [wandb.Image(midplane.unsqueeze(0))]})
 
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
@@ -278,6 +304,20 @@ class TrainLoop:
             self.summary_writer.add_scalar('loss/mse_wav_hhh', losses["mse_wav"][7].item(),
                                            global_step=self.step + self.resume_step)
 
+            # Log image level loss
+
+            # Log wavelet level loss
+            wandb.log({
+                'loss/mse_wav_lll': losses["mse_wav"][0].item(),
+                'loss/mse_wav_llh': losses["mse_wav"][1].item(),
+                'loss/mse_wav_lhl': losses["mse_wav"][2].item(),
+                'loss/mse_wav_lhh': losses["mse_wav"][3].item(),
+                'loss/mse_wav_hll': losses["mse_wav"][4].item(),
+                'loss/mse_wav_hlh': losses["mse_wav"][5].item(),
+                'loss/mse_wav_hhl': losses["mse_wav"][6].item(),
+                'loss/mse_wav_hhh': losses["mse_wav"][7].item(),
+                'step': self.step + self.resume_step
+            })
             weights = th.ones(len(losses["mse_wav"])).cuda()  # Equally weight all wavelet channel losses
 
             loss = (losses["mse_wav"] * weights).mean()
